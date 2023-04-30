@@ -1,30 +1,24 @@
 import { GatsbyNode } from 'gatsby'
-import fetch from 'node-fetch'
 import { createRemoteFileNode } from 'gatsby-source-filesystem'
+import fetch from 'node-fetch'
 import path from 'path'
+import { ProductWithImageFile, ProductWithImageLink } from 'src/types'
 
-export type Product = {
-  // should be from Query!!!!
-  id: string
-  name: string
-  description: string
-  image: string
-}
+const productPage = path.resolve(`./src/templates/product.tsx`)
 
-export type ProductFromQuery = Partial<Queries.Query['products']>
-
-const DEFAULT_PRODUCT_NAME = 'product name'
-const DEFAULT_PRODUCT_DESCRIPTION = 'product description'
+const NO_DESCRIPTION_AVAILABLE = 'no description available'
 
 export const sourceNodes: GatsbyNode['sourceNodes'] = async ({ actions: { createNode }, createContentDigest }) => {
   const response = await fetch('https://powerful-jodhpurs-bat.cyclic.app/data')
 
   const products = await response.json()
 
-  products.forEach((product: Product) => {
+  products.forEach((product: ProductWithImageLink) => {
+    if (!product || !product.id || !product.name || product.name.length === 0 || !product.price) return
+
     createNode({
       ...product,
-      id: product.id,
+      id: product.id.toString(),
       internal: {
         type: 'Products',
         contentDigest: createContentDigest(product),
@@ -33,19 +27,53 @@ export const sourceNodes: GatsbyNode['sourceNodes'] = async ({ actions: { create
   })
 }
 
-const productPage = path.resolve(`./src/templates/product.tsx`)
+export const onCreateNode: GatsbyNode['onCreateNode'] = async ({
+  node,
+  actions: { createNode, createNodeField },
+  createNodeId,
+  getCache,
+}) => {
+  if (node.internal.type !== 'Products' || node.image === null) return
+
+  const fileNode = await createRemoteFileNode({
+    url: (node.image as string) || 'src/images/icon.png',
+    parentNodeId: node.id,
+    createNode,
+    createNodeId,
+    getCache,
+  })
+
+  if (fileNode) {
+    createNodeField({ node, name: 'imageFile', value: fileNode.id })
+  }
+}
+
+export const createSchemaCustomization: GatsbyNode['createSchemaCustomization'] = ({ actions }) => {
+  const { createTypes } = actions
+
+  createTypes(`
+    type Products implements Node @derivedTypes @dontInfer {
+      id: Int
+      name: String
+      description: String
+      price: Float 
+      imageFile: File @link(from: "fields.imageFile")
+    }
+  `)
+}
 
 export const createPages: GatsbyNode['createPages'] = async ({ graphql, actions, reporter }) => {
   const { createPage } = actions
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: { errors?: any; data?: Queries.Query | undefined } = await graphql(`
+  const result: { errors?: any; data?: Queries.Query } = await graphql(`
     {
       allProducts {
         nodes {
           id
           name
           description
+          price
           imageFile {
             childImageSharp {
               gatsbyImageData(width: 700, placeholder: BLURRED)
@@ -56,64 +84,26 @@ export const createPages: GatsbyNode['createPages'] = async ({ graphql, actions,
     }
   `)
 
-  if (result.errors) {
-    reporter.panicOnBuild(`There was an error loading your blog posts`, result.errors)
+  if (result.errors || result.data === null || typeof result.data === 'undefined') {
+    reporter.panicOnBuild(`There was an error loading the blog posts`, result.errors)
     return
   }
 
-  if (typeof result.data === 'undefined') {
-    reporter.panicOnBuild(`result.data is undefined`, result.errors)
-    return
-  }
-
-  const products = result.data.allProducts.nodes
+  const products = result.data.allProducts.nodes as unknown as ProductWithImageFile[]
 
   if (products.length > 0) {
-    products.forEach((product: ProductFromQuery) => {
+    products.forEach((product: ProductWithImageFile) => {
       createPage({
         path: `product/${product!.id}`,
         component: productPage,
         context: {
-          id: product!.id,
-          name: product!.name || DEFAULT_PRODUCT_NAME,
-          description: product!.description || DEFAULT_PRODUCT_DESCRIPTION,
-          imageFile: product!.imageFile,
+          id: product.id,
+          name: product.name,
+          description: product.description || NO_DESCRIPTION_AVAILABLE,
+          price: product.price,
+          imageFile: product.imageFile,
         },
       })
     })
-  }
-}
-
-export const createSchemaCustomization: GatsbyNode['createSchemaCustomization'] = ({ actions }) => {
-  const { createTypes } = actions
-
-  createTypes(`
-    type Products implements Node @derivedTypes @dontInfer {
-      id: String
-      name: String
-      description: String
-      imageFile: File @link(from: "fields.localFile")
-    }
-  `)
-}
-
-export const onCreateNode: GatsbyNode['onCreateNode'] = async ({
-  node,
-  actions: { createNode, createNodeField },
-  createNodeId,
-  getCache,
-}) => {
-  if (node.internal.type === 'Products' && node.image !== null) {
-    const fileNode = await createRemoteFileNode({
-      url: (node.image as string) || 'https://picsum.photos/id/238/536/354',
-      parentNodeId: node.id,
-      createNode,
-      createNodeId,
-      getCache,
-    })
-
-    if (fileNode) {
-      createNodeField({ node, name: 'localFile', value: fileNode.id })
-    }
   }
 }

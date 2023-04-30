@@ -1,15 +1,18 @@
 import React, { FC } from 'react'
-import GatsbyImageOrDefaultImage from 'src/components/GatsbyImageOrDefaultImage'
-import { DEFAULT_PRODUCT_ALT } from 'src/constants'
+import { HeadFC } from 'gatsby'
+import { generateAltFromName } from 'utils/generateAltFromName'
+import { ProductWithImageFile } from 'types'
+import GatsbyImageOrDefaultImage from 'components/GatsbyImageOrDefaultImage'
 
 const Product: FC<Props> = ({ pageContext }) => {
-  const { id, name, description, imageFile } = pageContext
-  const imageAlt = name || DEFAULT_PRODUCT_ALT
+  const { name, description, imageFile } = pageContext
+  const imageAlt = generateAltFromName(name)
+
   return (
     <section>
       <h1>{name}</h1>
       <p>{description}</p>
-      <GatsbyImageOrDefaultImage id={id} imageFile={imageFile} imageAlt={imageAlt} />
+      <GatsbyImageOrDefaultImage imageFile={imageFile} imageAlt={imageAlt} />
     </section>
   )
 }
@@ -17,12 +20,7 @@ const Product: FC<Props> = ({ pageContext }) => {
 export default Product
 
 type Props = {
-  pageContext: PageContext
+  pageContext: ProductWithImageFile
 }
 
-type PageContext = {
-  id: string
-  name: string
-  description: string
-  imageFile: Queries.Maybe<Queries.File>
-}
+export const Head: HeadFC = () => <title>Product Page</title>
