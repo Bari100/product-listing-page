@@ -93,13 +93,16 @@ export const createPages: GatsbyNode['createPages'] = async ({ graphql, actions,
 
   if (products.length > 0) {
     products.forEach((product: ProductWithImageFile) => {
+      const productDescription =
+        product.description && product.description.length > 0 ? product.description : NO_DESCRIPTION_AVAILABLE
+
       createPage({
         path: `product/${product!.id}`,
         component: productPage,
         context: {
           id: product.id,
           name: product.name,
-          description: product.description || NO_DESCRIPTION_AVAILABLE,
+          description: productDescription,
           price: product.price,
           imageFile: product.imageFile,
         },
