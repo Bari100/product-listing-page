@@ -76,7 +76,7 @@ export const createPages: GatsbyNode['createPages'] = async ({ graphql, actions,
           price
           imageFile {
             childImageSharp {
-              gatsbyImageData(width: 700, placeholder: BLURRED)
+              gatsbyImageData(width: 500, placeholder: BLURRED)
             }
           }
         }
